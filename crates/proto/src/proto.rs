@@ -76,6 +76,9 @@ messages!(
     (ExpandAllForProjectEntryResponse, Foreground),
     (Follow, Foreground),
     (FollowResponse, Foreground),
+    (ForwardSshAgentOpen, Background),
+    (ForwardSshAgentData, Background),
+    (ForwardSshAgentClose, Background),
     (ApplyCodeActionKind, Foreground),
     (ApplyCodeActionKindResponse, Foreground),
     (FormatBuffers, Foreground),
@@ -386,6 +389,9 @@ messages!(
 
 request_messages!(
     (AllocateWorktreeId, AllocateWorktreeIdResponse),
+    (ForwardSshAgentOpen, Ack),
+    (ForwardSshAgentData, Ack),
+    (ForwardSshAgentClose, Ack),
     (ApplyCodeAction, ApplyCodeActionResponse),
     (
         ApplyCompletionAdditionalEdits,

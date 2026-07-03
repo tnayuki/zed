@@ -46,7 +46,11 @@ urlencoding.workspace = true
 util.workspace = true
 which.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+async-pipe.workspace = true
+
 [dev-dependencies]
+async-pipe.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
 fs = { workspace = true, features = ["test-support"] }
 util = { workspace = true, features = ["test-support"] }

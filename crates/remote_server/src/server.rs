@@ -567,6 +567,22 @@ pub fn execute_run(
 ) -> Result<()> {
     init_paths()?;
 
+    // Export SSH_AUTH_SOCK before the login shell environment is captured below,
+    // so every process the server later spawns (terminals, tasks, git, language
+    // servers) inherits it and reaches the client's agent via the forwarding
+    // socket bound once the app is running. The path is per-server (alongside
+    // the stdio sockets) to avoid collisions between concurrent remotes.
+    #[cfg(unix)]
+    let ssh_agent_socket_path = stdin_socket
+        .parent()
+        .map(|dir| dir.join("ssh-agent.sock"));
+    #[cfg(unix)]
+    if let Some(path) = &ssh_agent_socket_path {
+        // SAFETY: single-threaded startup, before any threads spawn (mirrors
+        // load_shell_from_passwd's SHELL set_var).
+        unsafe { std::env::set_var("SSH_AUTH_SOCK", path) };
+    }
+
     let startup_time = Instant::now();
     let app = gpui_platform::headless();
     let pid = std::process::id();
@@ -669,6 +685,19 @@ pub fn execute_run(
         let session = start_server(listeners, log_rx, cx, is_wsl_interop);
         init_telemetry_forwarding(session.clone(), cx);
         trusted_worktrees::init(HashMap::default(), cx);
+
+        // Bind the ssh-agent forwarding socket (path exported as SSH_AUTH_SOCK
+        // above) and tunnel agent traffic to the client. Leaked to live for the
+        // session, like `project` below.
+        #[cfg(unix)]
+        if let Some(path) = &ssh_agent_socket_path {
+            if let Some(dir) = path.parent() {
+                match remote::ssh_agent::SshAgentListener::start(dir, session.clone(), cx) {
+                    Ok(listener) => std::mem::forget(listener),
+                    Err(error) => log::warn!("ssh-agent forwarding disabled: {error}"),
+                }
+            }
+        }
 
         GitHostingProviderRegistry::set_global(git_hosting_provider_registry, cx);
         git_hosting_providers::init(cx);

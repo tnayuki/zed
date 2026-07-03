@@ -3,6 +3,8 @@ pub mod protocol;
 pub mod proxy;
 pub mod remote_client;
 pub mod remote_identity;
+#[cfg(any(unix, windows))]
+pub mod ssh_agent;
 mod transport;
 
 #[cfg(target_os = "windows")]

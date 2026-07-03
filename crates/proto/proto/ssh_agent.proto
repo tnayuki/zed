@@ -1,0 +1,31 @@
+syntax = "proto3";
+package zed.messages;
+
+// SSH agent forwarding as a protocol-agnostic byte tunnel.
+//
+// The remote server listens on a Unix socket exported as SSH_AUTH_SOCK. Each
+// accepted connection is opened as a tunnel to the client, which connects to
+// its own local agent (named by the client's SSH_AUTH_SOCK) and pipes raw
+// bytes both ways. One remote socket connection maps 1:1 to one local agent
+// connection, so no assumption is made about the ssh-agent framing.
+//
+// Every message is acknowledged so that a slow reader on the far side applies
+// natural backpressure to the near side's socket.
+
+// Server -> client: a new connection arrived on the forwarding socket; the
+// client should connect to its local agent for this connection_id.
+message ForwardSshAgentOpen {
+  uint64 connection_id = 1;
+}
+
+// Bidirectional: a chunk of bytes for connection_id, to be written verbatim to
+// the peer's end of the tunnel.
+message ForwardSshAgentData {
+  uint64 connection_id = 1;
+  bytes payload = 2;
+}
+
+// Bidirectional: the sender's end of connection_id closed (EOF or error).
+message ForwardSshAgentClose {
+  uint64 connection_id = 1;
+}

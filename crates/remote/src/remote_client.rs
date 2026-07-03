@@ -333,6 +333,9 @@ pub struct RemoteClient {
     platform: RemotePlatform,
     os_version: Option<String>,
     state: Option<State>,
+    // Retains the ssh-agent forwarding handlers for the connection's lifetime.
+    #[cfg(any(unix, windows))]
+    _ssh_agent_proxy: Option<Entity<crate::ssh_agent::SshAgentProxy>>,
 }
 
 #[derive(Debug)]
@@ -442,7 +445,27 @@ impl RemoteClient {
                     platform,
                     os_version: os_version.clone(),
                     state: Some(State::Connecting),
+                    #[cfg(any(unix, windows))]
+                    _ssh_agent_proxy: None,
                 });
+
+                // Forward the client's ssh-agent into the remote: the server
+                // exports SSH_AUTH_SOCK and tunnels agent traffic back here. The
+                // client reaches its local agent via a Unix socket
+                // (`$SSH_AUTH_SOCK`) on Unix or the OpenSSH named pipe on Windows.
+                #[cfg(any(unix, windows))]
+                {
+                    #[cfg(unix)]
+                    let connector = crate::ssh_agent::unix_socket_agent_connector();
+                    #[cfg(windows)]
+                    let connector = crate::ssh_agent::named_pipe_agent_connector();
+
+                    let proto_client: AnyProtoClient = client.clone().into();
+                    let proxy = cx.update(|cx| {
+                        crate::ssh_agent::SshAgentProxy::new(proto_client, Some(connector), cx)
+                    });
+                    this.update(cx, |this, _| this._ssh_agent_proxy = Some(proxy));
+                }
 
                 let io_task = remote_connection.start_proxy(
                     unique_identifier,
